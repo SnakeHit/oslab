@@ -95,8 +95,9 @@ ok_load_setup:
 	xor	bh,bh
 	int	0x10
 	
-	mov	cx,#24
-	mov	bx,#0x0007		! page 0, attribute 7 (normal)
+	mov	cx,#94
+	mov	bh,#0x00		! page 0, attribute 7 (normal)
+	mov	bl,#0x4f
 	mov	bp,#msg1
 	mov	ax,#0x1301		! write string, move cursor
 	int	0x10
@@ -243,7 +244,11 @@ sectors:
 
 msg1:
 	.byte 13,10
-	.ascii "Loading system ..."
+	.ascii "----------------------------"
+        .byte 13,10
+        .ascii "|Welcome to OS! Suyifan ...|"
+        .byte 13,10
+        .ascii "----------------------------"
 	.byte 13,10,13,10
 
 .org 508
@@ -251,10 +256,9 @@ root_dev:
 	.word ROOT_DEV
 boot_flag:
 	.word 0xAA55
-
 .text
 endtext:
 .data
 enddata:
 .bss
-endbss:
+endbss: ! 最后一行不能省略，否则as不通过

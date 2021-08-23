@@ -29,10 +29,27 @@ begbss:
 
 entry start
 start:
+!设置附加数据段寄存器ES的值指向SETUPSEG，以便可以正常显示字符串数据
+!ES:BP 指向将要显示字符串的位置
+	mov	ax, #SETUPSEG
+	mov	es,ax
+! Print some inane message
 
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh			! 页号bh=0
+	int	0x10
+	
+	mov	cx,#25
+	mov	bx,#0x0007		! page 0, attribute 7 (normal) 页号BH=0 属性BL=7正常显示
+	mov	bp,#msg2		! ES:BP要显示的字符串地址
+	mov	ax,#0x1301		! write string, move cursor AH=13显示字符串 AL=01光标跟随移动
+	int	0x10
+!stack
+        mov     ax,#INITSEG
+        mov     ss,ax
+        mov     sp,#0xff00
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
-
 	mov	ax,#INITSEG	! this is done in bootsect already, but...
 	mov	ds,ax
 	mov	ah,#0x03	! read cursor pos
@@ -60,7 +77,69 @@ start:
 	mov	[8],ax
 	mov	[10],bx
 	mov	[12],cx
+INITPRINT:
+! Be Ready to Print, es:bp, ds,si
+	mov ax,cs
+	mov es,ax
+	mov ax,#INITSEG
+	mov ds,ax
 
+Print_Cursor:
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh			! 页号bh=0
+	int	0x10
+	
+	mov	cx,#11
+	mov	bx,#0x0007		! page 0, attribute 7 (normal) 页号BH=0 属性BL=7正常显示
+	mov	bp,#Cursor		! ES:BP要显示的字符串地址
+	mov	ax,#0x1301		! write string, move cursor AH=13显示字符串 AL=01光标跟随移动
+	int	0x10
+	mov	dx,[0]
+	call print_hex
+	call print_nl
+
+Print_Memory:
+	mov	ah,#0x03
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#12
+	mov	bx,#0x0007
+	mov	bp,#Memory
+	mov	ax,#0x1301
+	int	0x10
+	mov	dx,[2]
+	call	print_hex
+	call	print_nl
+
+
+JMP_DATA:
+	jmp	GETDATA
+!下面是辅助过程调用，目的是输出4个十六进制的数和打印回车、换行
+print_hex:
+	mov	cx,#4
+print_digit:
+	rol	dx,#4
+	mov	ax,#0xe0f
+	and	al,dl
+	add	al,#0x30
+	cmp	al,#0x3a
+	jl	outp
+	add	al,#0x07
+outp:
+	int	0x10
+	loop	print_digit
+	ret
+print_nl:
+	mov	ax,#0xe0d     ! CR
+	int	0x10
+	mov	al,#0xa     ! LF
+	int	0x10
+	ret
+
+!执行完输出后，跳转到这里
+GETDATA:
 ! Get hd0 data
 
 	mov	ax,#0x0000
@@ -142,6 +221,7 @@ end_move:
 	out	#0x60,al
 	call	empty_8042
 
+
 ! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
 ! we put them right after the intel-reserved hardware interrupts, at
 ! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
@@ -220,7 +300,15 @@ idt_48:
 gdt_48:
 	.word	0x800		! gdt limit=2048, 256 GDT entries
 	.word	512+gdt,0x9	! gdt base = 0X9xxxx
-	
+msg2:
+	.byte	13,10
+	.ascii	"NOW enter the SETUP"
+	.byte	13,10,13,10	
+Cursor:
+	.ascii	"Cursor POS:"
+Memory:
+	.ascii	"Memory Size:"
+
 .text
 endtext:
 .data
